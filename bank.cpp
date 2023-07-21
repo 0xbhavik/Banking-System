@@ -46,12 +46,12 @@ string getDateInString(vector<int> date)
 
 unordered_map<int, Account> acctIdToacc;
 unordered_map<int, User> userIdToUser;
-
 unordered_map<int, SavingAccount> accIdtoSavAcc;
 unordered_map<int, CurrentAccount> accIdtoCurrAcc;
 unordered_map<int, LoanAccount> accIdtoLoanAcc;
 unordered_map<int, int> accTypes;
 set<int> allAccounts;
+set<int> userIdSet;
 
 // Declaring Account Class
 
@@ -73,10 +73,6 @@ public:
     int getBalance()
     {
         return this->balance;
-    }
-    void getAccountNumber()
-    {
-        cout << "your Account number is " << account_no << endl;
     }
 
     void viewDetails()
@@ -127,28 +123,29 @@ class Atm
 public:
     int card_no;
     int cvv;
-    string expiry_date;
+    vector<int> expiry_date;
 
     Atm()
     {
         card_no = _atm_card_no++;
         cvv = _cvv++;
-
-        // expiry_date = "" // todo
+        expiry_date = getExpiryDate();
     }
 
     void viewAtmDetails()
     {
         cout << "card_no : " << card_no << endl;
-        cout << "expiry_date : " << expiry_date << endl;
+        cout << "expiry_date : " << getDateInString(expiry_date) << endl;
         cout << "cvv : " << cvv << endl;
     }
-    void getExpiryDate()
+
+    vector<int> getExpiryDate()
     {
 
         vector<int> date = getdate();
 
-        // todo
+        date[2] += 4;
+        return date;
     }
 };
 
@@ -186,6 +183,11 @@ public:
             transactions[i].viewTransaction();
         }
     }
+    void viewAtmDetails()
+    {
+        atm.viewAtmDetails();
+        cout << endl;
+    }
 };
 
 class SavingAccount : public NonLoanAccount
@@ -210,6 +212,10 @@ public:
         max_daily_withdrawal_amt = 50000;
         penalty_amt_atm_withdrawal = 500;
     }
+
+    // bool validateCVV(int _cvv){
+    //     return _cvv == atm.cvv;
+    // }
 
     bool checkAgeEligibility(int age)
     {
@@ -310,6 +316,10 @@ public:
         // Remaining: logic for atm pin authentication
         if (flag == 1)
         {
+            // int _cvv;
+            // cout << "Enter CVV" << endl;
+            // cin >> _cvv;
+            
             bool flag = monthlyWithdrawalLimit(curr_date);
             if (flag)
             {
@@ -319,7 +329,7 @@ public:
                 cin >> _flag;
                 if (_flag == 2)
                     return;
-                this->balance -= penalty_amt_atm_withdrawal;
+                this->balance -= penalty_amt_atm_withdrawal; //todo
             }
             this->balance -= amt;
             Transaction newtxn(amt, curr_date, -1);
@@ -408,6 +418,26 @@ public:
 
     void checkMonthlyTransactions()
     {
+        vector<int> curr_date = getdate();
+        int curr_month = curr_date[1];
+        int no_of_txns = 0;
+        for (int i = transactions.size() - 1; i >= 0; i--)
+        {
+            Transaction txn = transactions[i];
+            if (txn.date[1] == curr_month)
+            {
+                no_of_txns++;
+            }
+            else
+            {
+                break;
+            }
+        }
+        if (no_of_txns < 3)
+        {
+            cout << "No. of transactions is less than 3 in this month, 500 rs is deducted as penalty";
+            this->balance -= 500;
+        }
     }
 };
 
@@ -415,7 +445,7 @@ class LoanAccount : public Account
 {
 public:
     int initialLoanAmt;
-    int LoanRemaining;
+    int loanRemaining;
     int percent_total_deposit;
     int min_duration_year;
     int min_amt;
@@ -501,6 +531,7 @@ public:
             return 0;
         }
         this->initialLoanAmt = amt;
+        this->loanRemaining = amt;
         this->duration = loan_duration;
         this->type = type;
 
@@ -532,9 +563,11 @@ public:
     {
         cout << "loan account no. : " << account_no << endl;
         cout << "loan type : " << getloanType(this->type) << endl;
+        cout << "loan interest rate : " << this->interest_rate << endl;
+        cout << "loan creation date : " << getDateInString(this->account_creation_date) << endl;
         cout << "loan duration : " << this->duration << endl;
         cout << "Total loan Amount : " << this->initialLoanAmt << endl;
-        cout << "loan Amount remaining : " << this->LoanRemaining << endl;
+        cout << "loan Amount remaining : " << this->loanRemaining << endl;
     }
     void RepayLoan()
     {
@@ -547,12 +580,12 @@ public:
             cout << "Error : deposit amount should not exceeding 10% of total loan amount. \n ";
             return;
         }
-        this->LoanRemaining -= amt;
+        this->loanRemaining -= amt;
     }
 
     void compoundInterest()
     {
-        LoanRemaining = LoanRemaining + (((LoanRemaining * interest_rate) / 100) / 2);
+        loanRemaining = loanRemaining + (((loanRemaining * interest_rate) / 100) / 2);
     }
 
     bool validityCheck(int amt)
@@ -665,12 +698,16 @@ public:
 
     void viewAllAccountDetails()
     {
-        cout << "your saving account details are listed below" << endl;
 
-        for (int i = 0; i < savingAccountsId.size(); i++)
+        if (savingAccountsId.size() > 0)
         {
-            SavingAccount acc = accIdtoSavAcc[savingAccountsId[i]];
-            acc.viewDetails();
+            cout << "your saving account details are listed below" << endl;
+
+            for (int i = 0; i < savingAccountsId.size(); i++)
+            {
+                SavingAccount acc = accIdtoSavAcc[savingAccountsId[i]];
+                acc.viewDetails();
+            }
         }
         cout << endl;
         if (currentAccountsId.size() > 0)
@@ -694,6 +731,23 @@ public:
             }
         }
         cout << endl;
+    }
+
+    void getAllLoanAmount()
+    {
+        int total_loan_amt = 0;
+        if (loanAccountsId.size() == 0)
+        {
+            cout << "user don't have any loan" << endl;
+        }
+        else
+        {
+            for (int i = 0; i < loanAccountsId.size(); i++)
+            {
+                total_loan_amt += accIdtoLoanAcc[loanAccountsId[i]].loanRemaining;
+            }
+        }
+        cout << "user total loan remaining : " << total_loan_amt << endl;
     }
 
     void viewTransactions()
@@ -806,7 +860,7 @@ void accountDashboard(int acc_no)
         int type = accTypes[acc_no];
         int flag;
         cout << endl;
-        cout << "1. Deposit Amount \n 2. Withdraw Amount \n 3. Show Transaction History \n 4. View Account Details \n 5. Exit \n";
+        cout << "1. Deposit Amount \n 2. Withdraw Amount \n 3. Show Transaction History \n 4. View Account Details \n 5. View Atm details \n 6. Exit \n";
         cin >> flag;
 
         switch (flag)
@@ -841,9 +895,13 @@ void accountDashboard(int acc_no)
 
             break;
         case 5:
-            return;
+            if (type == 1)
+                accIdtoSavAcc[acc_no].viewAtmDetails();
+            else if (type == 2)
+                accIdtoCurrAcc[acc_no].viewAtmDetails();
 
-            //  case 5:
+        case 6:
+            break;
         }
     }
 }
@@ -874,14 +932,13 @@ void LoanAccountDashboard(int acc_no)
 
 void ExistingUser()
 {
-
     while (true)
     {
         int user_id, flag;
         cout << "Enter user id" << endl;
         cin >> user_id;
         User user = userIdToUser[user_id];
-        cout << "1. View Accounts \n2. Create Account \n3. Go to Accounts \n4. View personal Details \n5. exit \n";
+        cout << "1. View Accounts \n2. Create Account \n3. Go to Accounts \n4. View personal Details \n5. Show totalLoanAmt \n6. exit \n";
         cin >> flag;
         if (flag == 1)
         {
@@ -919,11 +976,14 @@ void ExistingUser()
             user.viewPersonalDetails();
             cout << endl;
         }
+        else if (flag == 5)
+        {
+            user.getAllLoanAmount();
+            cout << endl;
+        }
         else
         {
             return;
-        }
-        {
         }
     }
 }
